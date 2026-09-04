@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><style>
+@font-face {
+  font-family: "Optimistic";
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("/fonts/OptimisticAI_VF_Optimized.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Optimistic Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/OptimisticMono_W_TextRegular.woff2") format("woff2");
+}
+:where(html) {
+  font-family: "Optimistic", system-ui, sans-serif;
+}
+:where(code, pre, kbd, samp) {
+  font-family: "Optimistic Mono", ui-monospace, monospace;
+}
+</style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no"/>
+<meta name="theme-color" content="#181817"/>
+<title>Claude — BYOK Workbench</title>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&family=Plus+Jakarta+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.css"/>
+<script>tailwind.config={theme:{extend:{colors:{canvas:'#181817',surface:'#242421',elevated:'#2A2926',active:'#32312D',border1:'#33312B',border2:'#3D3B35',text1:'#F5F4F0',text2:'#9C9A92',text3:'#6B6964',accent:'#D97757'},fontFamily:{serif:["Newsreader","Georgia","serif"],sans:["Plus Jakarta Sans","system-ui","sans-serif"],mono:["JetBrains Mono","monospace"]}}}}</script>
+<style>
+*{ -webkit-tap-highlight-color:transparent; }
+html,body{ margin:0; padding:0; background:#0a0a09; overscroll-behavior:none; }
+#app{ width:100vw; height:100dvh; max-width:430px; margin:0 auto; overflow:hidden; position:relative; background:#181817; display:flex; flex-direction:column; padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom); }
+.serif{ font-family:'Newsreader',Georgia,serif; }
+.sans{ font-family:'Plus Jakarta Sans',system-ui,sans-serif; letter-spacing:-0.015em; }
+.mono{ font-family:'JetBrains Mono',monospace; font-variant-ligatures:none; }
+.touch44{ min-width:44px; min-height:44px; display:flex; align-items:center; justify-content:center; }
+:active.scale97{ transform:scale(.97); transition:transform .12s ease; }
+.scroll{ scrollbar-width:none; -ms-overflow-style:none; }
+.scroll::-webkit-scrollbar{ display:none; }
+.sunburst{ animation:spinSlow 22s linear infinite; }
+@keyframes spinSlow{ from{transform:rotate(0)} to{transform:rotate(360deg)} }
+@keyframes pulseDot{ 0%,100%{ opacity:1; transform:scale(1)} 50%{opacity:.6; transform:scale(.85)} }
+.dot{ animation:pulseDot 1.4s ease-in-out infinite; }
+.sheet{ transform:translateY(110%); transition:transform .42s cubic-bezier(.32,.72,0,1); will-change:transform; }
+.sheet.open{ transform:translateY(0); }
+.drawer{ transform:translateX(-105%); transition:transform .42s cubic-bezier(.32,.72,0,1); }
+.drawer.open{ transform:translateX(0); }
+.rubber{ overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
+.code-wrap pre{ margin:0 !important; background:transparent !important; }
+</style>
+</head>
+<body class="sans bg-[#0a0a09] text-[#F5F4F0] antialiased">
+<div id="app" class="select-none">
+  <!-- Top App Bar -->
+  <header class="h-[56px] shrink-0 flex items-center justify-between px-4 border-b border-[#33312B] bg-[#181817] z-30">
+    <button id="btnMenu" class="touch44 rounded-full active:bg-[#2A2926] active:scale-95 transition"><i data-lucide="menu" class="w-5 h-5 text-[#F5F4F0]"></i></button>
+    <div class="flex items-center gap-2">
+      <div class="serif text-[22px] tracking-tight">Claude</div>
+      <div class="w-6 h-6 rounded-full bg-[#D97757] flex items-center justify-center text-[11px] font-bold text-[#181817]">✦</div>
+    </div>
+    <button id="btnSettings" class="touch44 rounded-full active:bg-[#2A2926]"><i data-lucide="settings-2" class="w-5 h-5 text-[#F5F4F0]"></i></button>
+  </header>
+
+  <!-- Left Drawer -->
+  <div id="drawerBackdrop" class="absolute inset-0 bg-black/60 backdrop-blur-sm z-40 hidden"></div>
+  <aside id="drawer" class="drawer absolute top-0 left-0 bottom-0 w-[86%] max-w-[340px] bg-[#242421] z-50 flex flex-col border-r border-[#33312B]">
+    <div class="h-[56px] flex items-center justify-between px-5 pt-[env(safe-area-inset-top)]">
+      <span class="serif text-2xl">Claude</span>
+      <span class="w-8 h-8 rounded-full bg-[#2A2926] border border-[#33312B] flex items-center justify-center">◍</span>
+    </div>
+    <div class="px-3 py-3 space-y-5 overflow-y-auto rubber scroll flex-1">
+      <div class="space-y-1">
+        <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm hover:bg-[#2A2926]"><i data-lucide="message-circle" class="w-4 h-4"></i> Chats</button>
+        <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm hover:bg-[#2A2926]"><i data-lucide="folder-kanban" class="w-4 h-4"></i> Projects</button>
+        <button id="btnArtifactsDrawer" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm hover:bg-[#2A2926]"><i data-lucide="layout-panel-left" class="w-4 h-4"></i> Artifacts</button>
+        <button id="btnGithubDrawer" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm hover:bg-[#2A2926]"><i data-lucide="github" class="w-4 h-4"></i> GitHub</button>
+      </div>
+      <div>
+        <div class="text-[11px] font-semibold tracking-widest text-[#9C9A92] uppercase px-3 mb-2">Starred</div>
+        <div id="starredList" class="space-y-1"></div>
+      </div>
+      <div>
+        <div class="text-[11px] font-semibold tracking-widest text-[#9C9A92] uppercase px-3 mb-2">Recents</div>
+        <div id="recentList" class="space-y-1"></div>
+      </div>
+    </div>
+    <div class="p-3 border-t border-[#33312B] flex items-center gap-3">
+      <div class="w-9 h-9 rounded-full bg-[#D97757] text-[#181817] flex items-center justify-center font-bold">A</div>
+      <button id="btnNewChat" class="flex-1 bg-white text-[#181817] rounded-full py-2.5 px-6 font-medium text-[14px] shadow-md active:scale-95 transition">+ New chat</button>
+      <button class="w-10 h-10 rounded-full bg-[#242421] border border-[#33312B] touch44"><i data-lucide="mic" class="w-4 h-4"></i></button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="flex-1 relative overflow-hidden flex flex-col bg-[#181817]">
+    <!-- Empty State -->
+    <section id="emptyView" class="flex-1 flex flex-col items-center justify-center px-6 text-center">
+      <div class="relative">
+        <svg width="84" height="84" viewBox="0 0 100 100" class="sunburst">
+          <g transform="translate(50 50)">
+            <g id="rays"></g>
+            <circle r="14" fill="#D97757"/>
+          </g>
+        </svg>
+      </div>
+      <h1 class="serif text-[32px] tracking-tight mt-4">Ayu returns!</h1>
+      <p class="text-[#9C9A92] text-[14px] mt-2 max-w-[260px] leading-relaxed">Offline-first BYOK workbench. Bring your keys, GitHub PAT, and search APIs. Everything stays on device.</p>
+      <div class="mt-6 grid grid-cols-2 gap-2 w-full max-w-[340px]">
+        <button class="quickPrompt bg-[#242421] border border-[#33312B] rounded-2xl p-3 text-left active:bg-[#2A2926]"><div class="text-[13px] font-medium">Build a React app</div><div class="text-[11px] text-[#9C9A92]">with artifact preview</div></button>
+        <button class="quickPrompt bg-[#242421] border border-[#33312B] rounded-2xl p-3 text-left active:bg-[#2A2926]"><div class="text-[13px] font-medium">Review my repo</div><div class="text-[11px] text-[#9C9A92]">GitHub diff + PR</div></button>
+        <button class="quickPrompt bg-[#242421] border border-[#33312B] rounded-2xl p-3 text-left active:bg-[#2A2926]"><div class="text-[13px] font-medium">Search the web</div><div class="text-[11px] text-[#9C9A92]">citations included</div></button>
+        <button class="quickPrompt bg-[#242421] border border-[#33312B] rounded-2xl p-3 text-left active:bg-[#2A2926]"><div class="text-[13px] font-medium">Parse PDF</div><div class="text-[11px] text-[#9C9A92]">client-side only</div></button>
+      </div>
+    </section>
+
+    <!-- Chat Conversation -->
+    <section id="chatView" class="hidden flex-1 flex flex-col overflow-hidden">
+      <div id="pullIndicator" class="h-0 flex items-center justify-center overflow-hidden transition-all">
+        <div class="w-6 h-6 rounded-full border-2 border-[#D97757] border-t-transparent animate-spin"></div>
+      </div>
+      <div id="chatScroll" class="flex-1 overflow-y-auto rubber scroll px-4 py-4 space-y-4">
+        <div id="chatMessages" class="space-y-5"></div>
+        <div id="thinkingHost" class="hidden"></div>
+        <div id="telemetryPill" class="hidden fixed top-[68px] left-1/2 -translate-x-1/2 z-20 bg-[#2A2926] border border-[#33312B] rounded-full px-3 py-1.5 text-[11px] mono flex items-center gap-2 shadow-lg">
+          <span class="w-2 h-2 rounded-full bg-[#D97757] dot"></span><span id="telemetryText">Think: 0 • Out: 0 • 0 tps</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Artifact Workbench -->
+    <section id="artifactView" class="hidden flex-1 flex flex-col bg-[#1e1e1c]">
+      <div class="h-11 flex items-center gap-2 px-2 border-b border-[#33312B] bg-[#242421]">
+        <button id="btnCloseArtifacts" class="touch44"><i data-lucide="x" class="w-4 h-4"></i></button>
+        <div id="artifactTabs" class="flex-1 flex gap-1 overflow-x-auto scroll"></div>
+        <button id="btnPreviewToggle" class="text-[11px] px-2 py-1 rounded-full bg-[#181817] border border-[#33312B]">Preview</button>
+      </div>
+      <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
+        <div id="artifactCodePane" class="flex-1 overflow-auto bg-[#181817] p-3 mono text-[12px] leading-6"></div>
+        <div id="artifactPreviewPane" class="flex-1 border-t md:border-t-0 md:border-l border-[#33312B] bg-white overflow-hidden">
+          <iframe id="artifactFrame" class="w-full h-full border-0" sandbox="allow-scripts allow-same-origin"></iframe>
+        </div>
+      </div>
+      <div class="h-9 flex items-center justify-between px-3 border-t border-[#33312B] text-[11px] text-[#9C9A92]">
+        <span>Drag divider • Swipe to switch Chat/Artifacts</span>
+        <button id="btnCopyArtifact" class="px-2 py-1 rounded-full bg-[#2A2926] border border-[#33312B] text-[#F5F4F0]">Copy</button>
+      </div>
+    </section>
+
+    <!-- Bottom Input Capsule -->
+    <footer id="inputDock" class="shrink-0 px-3 pb-[8px] pt-2 bg-[#181817] z-20">
+      <div id="tokenMeter" class="hidden mx-2 mb-2 h-6 rounded-full bg-[#242421] border border-[#33312B] px-3 flex items-center justify-between text-[10px] mono">
+        <span id="tokenMeterLabel" class="text-[#9C9A92]">0 / 128k tokens</span><span id="tokenMeterBar" class="w-20 h-1.5 bg-[#33312B] rounded-full overflow-hidden ml-2"><span id="tokenMeterFill" class="h-full bg-[#D97757] block w-0"></span></span>
+      </div>
+      <div class="bg-[#242421] rounded-[28px] border border-[#33312B] shadow-[0_8px_24px_rgba(0,0,0,.35)] overflow-hidden">
+        <div id="contextBanner" class="flex items-center justify-between px-4 h-9 bg-[#2A2926] border-b border-[#33312B] text-[12px]">
+          <span class="text-[#9C9A92]">Get more with Claude Pro • <b class="text-[#F5F4F0] font-medium">Upgrade to Pro</b></span>
+          <button id="btnDismissBanner" class="touch44 -mr-2"><i data-lucide="x" class="w-4 h-4 text-[#9C9A92]"></i></button>
+        </div>
+        <div class="flex items-end gap-2 p-2">
+          <button id="btnAttach" class="touch44 w-9 h-9 rounded-full bg-[#181817] border border-[#33312B]"><i data-lucide="plus" class="w-4 h-4"></i></button>
+          <textarea id="chatInput" rows="1" placeholder="Chat with Claude..." class="flex-1 bg-transparent outline-none resize-none max-h-[140px] py-2.5 text-[15px] leading-6 placeholder:text-[#9C9A92]"></textarea>
+          <button id="btnSend" class="touch44 w-9 h-9 rounded-full bg-white text-[#181817] active:scale-95"><i data-lucide="arrow-up" class="w-5 h-5"></i></button>
+        </div>
+        <div class="flex items-center justify-between px-3 pb-2.5 pt-1">
+          <div class="flex items-center gap-2">
+            <button id="btnModel" class="bg-[#181817] border border-[#33312B] text-[12px] px-3 py-1.5 rounded-full flex items-center gap-1.5"><span id="modelLabel">Sonnet 5 Thinking</span><i data-lucide="chevron-down" class="w-3 h-3"></i></button>
+            <span id="queueBadge" class="hidden text-[10px] px-2 py-1 rounded-full bg-[#D97757]/20 text-[#D97757] border border-[#D97757]/30">QUEUED</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="btnMic" class="w-8 h-8 rounded-full bg-[#181817] border border-[#33312B] touch44"><i data-lucide="mic" class="w-4 h-4"></i></button>
+            <button id="btnVoice" class="w-8 h-8 rounded-full bg-[#181817] border border-[#33312B] touch44"><i data-lucide="audio-lines" class="w-4 h-4"></i></button>
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center justify-center gap-1.5 mt-2 text-[10px] text-[#6B6964]"><span class="w-3 h-3 rounded-full bg-[#D97757] flex items-center justify-center text-[8px] text-[#181817]">✦</span> Claude is AI and can make mistakes. Please double-check responses.</div>
+    </footer>
+  </main>
+
+  <!-- Bottom Sheets -->
+  <div id="sheetBackdrop" class="absolute inset-0 bg-black/60 backdrop-blur-sm z-40 hidden"></div>
+
+  <!-- Settings Sheet -->
+  <section id="settingsSheet" class="sheet absolute bottom-0 left-0 right-0 max-h-[88dvh] bg-[#242421] rounded-t-[28px] border-t border-[#33312B] z-50 flex flex-col overflow-hidden">
+    <div class="w-10 h-1 rounded-full bg-[#3D3B35] mx-auto my-2 shrink-0"></div>
+    <div class="px-5 py-3 flex items-center justify-between border-b border-[#33312B]"><span class="serif text-xl">Settings • Vault</span><button data-close-sheet class="touch44"><i data-lucide="x" class="w-5 h-5"></i></button></div>
+    <div class="flex-1 overflow-y-auto rubber scroll p-5 space-y-6">
+      <div class="bg-[#181817] rounded-2xl p-4 border border-[#33312B] space-y-3">
+        <div class="text-[12px] text-[#9C9A92] uppercase tracking-widest font-semibold">Security PIN (PBKDF2 → AES-GCM)</div>
+        <input id="vaultPin" type="password" placeholder="Set PIN to encrypt keys" class="w-full bg-[#242421] border border-[#33312B] rounded-xl px-3 py-2.5 text-[14px] outline-none"/>
+        <div class="flex gap-2"><button id="btnLockVault" class="flex-1 bg-white text-[#181817] rounded-full py-2.5 text-sm font-medium">Lock & Encrypt</button><button id="btnUnlockVault" class="flex-1 bg-[#2A2926] border border-[#33312B] rounded-full py-2.5 text-sm">Unlock</button></div>
+        <div id="vaultStatus" class="text-[11px] mono text-[#9C9A92]">Vault: uninitialized</div>
+      </div>
+      <div class="space-y-3">
+        <div class="text-[12px] uppercase tracking-widest font-semibold text-[#9C9A92]">Providers • BYOK</div>
+        <div class="grid gap-3">
+          <label class="block"><span class="text-[12px] text-[#9C9A92]">Anthropic API Key</span><input data-key="anthropic" type="password" class="keyInput w-full mt-1 bg-[#181817] border border-[#33312B] rounded-xl px-3 py-2.5 text-[13px] mono outline-none" placeholder="sk-ant-..."/></label>
+          <label class="block"><span class="text-[12px] text-[#9C9A92]">OpenAI API Key</span><input data-key="openai" type="password" class="keyInput w-full mt-1 bg-[#181817] border border-[#33312B] rounded-xl px-3 py-2.5 text-[13px] mono outline-none" placeholder="sk-..."/></label>
+          <label class="block"><span class="text-[12px] text-[#9C9A92]">DeepSeek API Key</span><input data-key="deepseek" type="password" class="keyInput w-full mt-1 bg-[#181817] border border-[#33312B] rounded-xl px-3 py-2.5 text-[13px] mono outline-none"/></label>
+          <label class="block"><span class="text-[12px] text-[#9C9A92]">Kimi / Moonshot API Key</span><input data-key="kimi" type="password" class="keyInput w-full mt-1 bg-[#181817] border border-[#33312B] rounded-xl px-3 py-2.5 text-[13px] mono outline-none"/></label>
+          <label class="block"><span class="text-[12px] text-[#9C9A92]">GitHub PAT (repo, workflow)</span><input data-key="github" type="password" class="keyInput w-full mt-1 bg-[#181817] border border-[#33312B] rounded-xl px-3 py-2.5 text-[13px] mono outline-none" placeholder="ghp_..."/></label>
+          <label class="block"><span class="text-[12px] text-[#9C9A92]">Tavily Search Key</span><input data-key="tavily" type="password" class="keyInput w-full mt-1 bg-[#181817] border border-[#33312B] rounded-xl px-3 py-2.5 text-[13px] mono outline-none"/></label>
+          <label class="block"><span class="text-[12px] text-[#9C9A92]">Brave Search Key</span><input data-key="brave" type="password" class="keyInput w-full mt-1 bg-[#181817] border border-[#33312B] rounded-xl px-3 py-2.5 text-[13px] mono outline-none"/></label>
+          <label class="block"><span class="text-[12px] text-[#9C9A92]">Serper API Key</span><input data-key="serper" type="password" class="keyInput w-full mt-1 bg-[#181817] border border-[#33312B] rounded-xl px-3 py-2.5 text-[13px] mono outline-none"/></label>
+        </div>
+        <button id="btnSaveKeys" class="w-full bg-[#D97757] text-white rounded-full py-3 text-[14px] font-medium active:scale-95 transition">Save Encrypted to IndexedDB</button>
+      </div>
+      <div class="space-y-3">
+        <div class="text-[12px] uppercase tracking-widest font-semibold text-[#9C9A92]">Thinking Budget</div>
+        <div class="flex gap-2 flex-wrap">
+          <button data-budget="1000" class="budgetBtn px-3 py-2 rounded-full border border-[#33312B] bg-[#181817] text-[12px]">1k</button>
+          <button data-budget="8000" class="budgetBtn px-3 py-2 rounded-full border border-[#D97757] bg-[#D97757]/20 text-[12px]">8k Default</button>
+          <button data-budget="16000" class="budgetBtn px-3 py-2 rounded-full border border-[#33312B] bg-[#181817] text-[12px]">16k</button>
+          <button data-budget="32000" class="budgetBtn px-3 py-2 rounded-full border border-[#33312B] bg-[#181817] text-[12px]">32k</button>
+          <button data-budget="unlimited" class="budgetBtn px-3 py-2 rounded-full border border-[#33312B] bg-[#181817] text-[12px]">Unlimited</button>
+        </div>
+        <div id="budgetWarning" class="hidden text-[11px] p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-200">Extended reasoning may take several minutes and consume significant output tokens.</div>
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block"><span class="text-[11px] text-[#9C9A92]">Reasoning Effort (OpenAI)</span><select id="reasoningEffort" class="w-full mt-1 bg-[#181817] border border-[#33312B] rounded-xl px-3 py-2 text-[12px]"><option>low</option><option selected>medium</option><option>high</option></select></label>
+          <label class="block"><span class="text-[11px] text-[#9C9A92]">Pricing Mode</span><select id="pricingMode" class="w-full mt-1 bg-[#181817] border border-[#33312B] rounded-xl px-3 py-2 text-[12px]"><option value="anthropic">Anthropic</option><option value="deepseek-peak">DeepSeek Peak</option><option value="deepseek-off">DeepSeek Off-Peak</option><option value="openai">OpenAI</option></select></label>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Model Selector Sheet -->
+  <section id="modelSheet" class="sheet absolute bottom-0 left-0 right-0 max-h-[70dvh] bg-[#242421] rounded-t-[28px] border-t border-[#33312B] z-50 flex flex-col">
+    <div class="w-10 h-1 rounded-full bg-[#3D3B35] mx-auto my-2"></div>
+    <div class="px-5 py-3 text-[13px] font-medium">Select Model • Thinking Enabled</div>
+    <div id="modelList" class="flex-1 overflow-y-auto rubber scroll p-2 pb-8 space-y-1"></div>
+  </section>
+
+  <!-- Attach Sheet -->
+  <section id="attachSheet" class="sheet absolute bottom-0 left-0 right-0 bg-[#242421] rounded-t-[28px] border-t border-[#33312B] z-50">
+    <div class="w-10 h-1 rounded-full bg-[#3D3B35] mx-auto my-2"></div>
+    <div class="p-4 grid grid-cols-3 gap-3">
+      <button data-attach="file" class="bg-[#181817] border border-[#33312B] rounded-2xl p-4 flex flex-col items-center gap-2 active:bg-[#2A2926]"><i data-lucide="file-up" class="w-5 h-5"></i><span class="text-[12px]">File</span></button>
+      <button data-attach="pdf" class="bg-[#181817] border border-[#33312B] rounded-2xl p-4 flex flex-col items-center gap-2 active:bg-[#2A2926]"><i data-lucide="file-text" class="w-5 h-5"></i><span class="text-[12px]">PDF Parse</span></button>
+      <button data-attach="github" class="bg-[#181817] border border-[#33312B] rounded-2xl p-4 flex flex-col items-center gap-2 active:bg-[#2A2926]"><i data-lucide="github" class="w-5 h-5"></i><span class="text-[12px]">GitHub</span></button>
+      <button data-attach="search" class="bg-[#181817] border border-[#33312B] rounded-2xl p-4 flex flex-col items-center gap-2 active:bg-[#2A2926]"><i data-lucide="search" class="w-5 h-5"></i><span class="text-[12px]">Web Search</span></button>
+      <button data-attach="camera" class="bg-[#181817] border border-[#33312B] rounded-2xl p-4 flex flex-col items-center gap-2 active:bg-[#2A2926]"><i data-lucide="camera" class="w-5 h-5"></i><span class="text-[12px]">Camera</span></button>
+      <button data-attach="code" class="bg-[#181817] border border-[#33312B] rounded-2xl p-4 flex flex-col items-center gap-2 active:bg-[#2A2926]"><i data-lucide="code-2" class="w-5 h-5"></i><span class="text-[12px]">Artifact</span></button>
+    </div>
+    <input id="fileInput" type="file" class="hidden" multiple/>
+  </section>
+
+  <!-- GitHub Sheet -->
+  <section id="githubSheet" class="sheet absolute bottom-0 left-0 right-0 max-h-[86dvh] bg-[#242421] rounded-t-[28px] border-t border-[#33312B] z-50 flex flex-col">
+    <div class="w-10 h-1 rounded-full bg-[#3D3B35] mx-auto my-2"></div>
+    <div class="px-5 py-3 flex items-center justify-between border-b border-[#33312B]"><span class="font-medium text-[14px]">GitHub • DevOps</span><button data-close-sheet class="touch44"><i data-lucide="x" class="w-4 h-4"></i></button></div>
+    <div class="p-3 flex gap-2"><input id="ghSearch" placeholder="Search repos / @file" class="flex-1 bg-[#181817] border border-[#33312B] rounded-full px-4 py-2.5 text-[13px] outline-none"/><button id="btnListRepos" class="bg-white text-[#181817] rounded-full px-4 py-2 text-[13px] font-medium">List</button></div>
+    <div id="ghList" class="flex-1 overflow-y-auto rubber scroll px-3 pb-4 space-y-3"></div>
+    <div class="p-3 border-t border-[#33312B] grid grid-cols-3 gap-2">
+      <button id="btnGhCommit" class="bg-[#D97757] text-white rounded-full py-2.5 text-[12px]">Commit Diff</button>
+      <button id="btnGhBranchPR" class="bg-[#181817] border border-[#33312B] rounded-full py-2.5 text-[12px]">Branch + PR</button>
+      <button id="btnGhActions" class="bg-[#181817] border border-[#33312B] rounded-full py-2.5 text-[12px]">Actions</button>
+    </div>
+  </section>
+
+  <!-- Context Menu Sheet (long-press) -->
+  <section id="contextSheet" class="sheet absolute bottom-0 left-0 right-0 bg-[#242421] rounded-t-[28px] border-t border-[#33312B] z-[60]">
+    <div class="w-10 h-1 rounded-full bg-[#3D3B35] mx-auto my-2"></div>
+    <div id="contextActions" class="p-2 pb-6 space-y-1"></div>
+  </section>
+
+  <!-- Citation Preview Sheet -->
+  <section id="citeSheet" class="sheet absolute bottom-0 left-0 right-0 max-h-[60dvh] bg-[#242421] rounded-t-[28px] border-t border-[#33312B] z-[60] overflow-auto">
+    <div class="w-10 h-1 rounded-full bg-[#3D3B35] mx-auto my-2"></div>
+    <div id="citeContent" class="p-5"></div>
+  </section>
+</div>
+
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/lib/marked.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script>
+const HAPTIC={light:()=>navigator.vibrate?.(10), medium:()=>navigator.vibrate?.(25), confirm:()=>navigator.vibrate?.([15,50,15]), soft:()=>navigator.vibrate?.(12)};
+const $=s=>document.querySelector(s);
+const $$=s=>[...document.querySelectorAll(s)];
+/* Sunburst rays */
+(() => {
+  const g=$('#rays'); if(!g) return;
+  for(let i=0;i<16;i++){ const a=i*22.5*Math.PI/180; const p=document.createElementNS('http://www.w3.org/2000/svg','path'); const x1=Math.cos(a)*16, y1=Math.sin(a)*16, x2=Math.cos(a)*42, y2=Math.sin(a)*42; p.setAttribute('d',`M ${x1} ${y1} L ${x2} ${y2}`); p.setAttribute('stroke','#D97757'); p.setAttribute('stroke-width','3.2'); p.setAttribute('stroke-linecap','round'); p.setAttribute('opacity','0.95'); g.appendChild(p); }
+})();
+
+/* IndexedDB */
+const DB_NAME='claude_byok_v2'; const DB_VER=3;
+function openDB(){ return new Promise((res,rej)=>{ const r=indexedDB.open(DB_NAME,DB_VER); r.onupgradeneeded=e=>{ const db=e.target.result; if(!db.objectStoreNames.contains('conversations')) db.createObjectStore('conversations',{keyPath:'id'}); if(!db.objectStoreNames.contains('messages')) db.createObjectStore('messages',{keyPath:'id'}).createIndex('conv','convId'); if(!db.objectStoreNames.contains('vault')) db.createObjectStore('vault',{keyPath:'k'}); if(!db.objectStoreNames.contains('artifacts')) db.createObjectStore('artifacts',{keyPath:'id'}); if(!db.objectStoreNames.contains('thinkBuf')) db.createObjectStore('thinkBuf',{keyPath:'id'}); }; r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); });}
+async function idbPut(store,obj){ const db=await openDB(); return new Promise((res,rej)=>{ const tx=db.transaction(store,'readwrite'); tx.objectStore(store).put(obj); tx.oncomplete=()=>res(true); tx.onerror=()=>rej(tx.error); });}
+async function idbGet(store,key){ const db=await openDB(); return new Promise((res,rej)=>{ const tx=db.transaction(store,'readonly'); const rq=tx.objectStore(store).get(key); rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error); });}
+async function idbGetAll(store){ const db=await openDB(); return new Promise((res,rej)=>{ const tx=db.transaction(store,'readonly'); const rq=tx.objectStore(store).getAll(); rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error); });}
+
+/* Crypto Vault AES-GCM PBKDF2 */
+let vaultKey=null, vaultSalt=null;
+async function deriveKey(pin,salt){ const enc=new TextEncoder(); const km=await crypto.subtle.importKey('raw',enc.encode(pin),'PBKDF2',false,['deriveKey']); return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:100000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']); }
+async function vaultInit(pin){ vaultSalt=crypto.getRandomValues(new Uint8Array(16)); vaultKey=await deriveKey(pin,vaultSalt); await idbPut('vault',{k:'salt',v:Array.from(vaultSalt)}); $('#vaultStatus').textContent='Vault: unlocked (derived)'; }
+async function vaultLoad(pin){ const s=await idbGet('vault','salt'); if(!s){ await vaultInit(pin); return; } vaultSalt=new Uint8Array(s.v); vaultKey=await deriveKey(pin,vaultSalt); $('#vaultStatus').textContent='Vault: unlocked'; }
+async function vaultEncrypt(obj){ if(!vaultKey) throw new Error('Vault locked'); const iv=crypto.getRandomValues(new Uint8Array(12)); const pt=new TextEncoder().encode(JSON.stringify(obj)); const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},vaultKey,pt); return {iv:Array.from(iv),ct:Array.from(new Uint8Array(ct))}; }
+async function vaultDecrypt(pack){ if(!vaultKey) throw new Error('Vault locked'); const iv=new Uint8Array(pack.iv); const ct=new Uint8Array(pack.ct); const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv},vaultKey,ct); return JSON.parse(new TextDecoder().decode(pt)); }
+
+/* State */
+const state={
+  currentConv:null,
+  model:{id:'claude-3-5-sonnet-20241022',label:'Sonnet 5 Thinking',provider:'anthropic',base:'https://api.anthropic.com/v1'},
+  thinkingBudget:8000,
+  reasoningEffort:'medium',
+  pricingMode:'anthropic',
+  keys:{}, // decrypted
+  conversations:[],
+  messages:{},
+  artifacts:[], // {id,name,lang,content}
+  activeArtifact:null,
+  github:{repo:null, tree:[], selectedFiles:[]},
+  isStreaming:false,
+  offlineQueue:[],
+  thinkBuffer:[], // virtualized
+};
+const MODELS=[
+  {id:'claude-3-5-sonnet-20241022',label:'Sonnet 5 Thinking',provider:'anthropic',base:'https://api.anthropic.com/v1'},
+  {id:'claude-3-5-haiku-20241022',label:'Haiku 4 Fast',provider:'anthropic',base:'https://api.anthropic.com/v1'},
+  {id:'claude-3-opus-20240229',label:'Opus Thinking Max',provider:'anthropic',base:'https://api.anthropic.com/v1'},
+  {id:'gpt-4o',label:'GPT-4o',provider:'openai',base:'https://api.openai.com/v1'},
+  {id:'o3-mini',label:'o3-mini Reasoning',provider:'openai',base:'https://api.openai.com/v1'},
+  {id:'deepseek-chat',label:'DeepSeek V4 Pro',provider:'deepseek',base:'https://api.deepseek.com/v1'},
+  {id:'deepseek-reasoner',label:'DeepSeek R1 Thinking',provider:'deepseek',base:'https://api.deepseek.com/v1'},
+  {id:'moonshot-v1-128k',label:'Kimi K3 128k',provider:'kimi',base:'https://api.moonshot.cn/v1'},
+];
+const PRICING={
+  'anthropic':{in:3/1e6,out:15/1e6,think:3/1e6},
+  'deepseek-peak':{in:0.27/1e6,out:1.1/1e6,think:0.27/1e6},
+  'deepseek-off':{in:0.135/1e6,out:0.55/1e6,think:0.135/1e6},
+  'openai':{in:2.5/1e6,out:10/1e6,think:2.5/1e6},
+};
+
+/* UI Helpers */
+function renderLucide(){ lucide.createIcons(); }
+function openSheet(el){ $('#sheetBackdrop').classList.remove('hidden'); el.classList.add('open'); HAPTIC.light(); }
+function closeSheets(){ $$('.sheet').forEach(s=>s.classList.remove('open')); $('#sheetBackdrop').classList.add('hidden'); $('#drawerBackdrop').classList.add('hidden'); $('#drawer').classList.remove('open'); }
+function openDrawer(){ $('#drawerBackdrop').classList.remove('hidden'); $('#drawer').classList.add('open'); }
+function estimateTokens(str){ return Math.ceil((str||'').length/4); }
+
+/* Conversations */
+async function loadConvs(){ const all=await idbGetAll('conversations'); state.conversations=(all||[]).sort((a,b)=>b.updated-a.updated); renderConvs(); }
+function renderConvs(){
+  const recent=$('#recentList'); recent.innerHTML='';
+  state.conversations.slice(0,20).forEach(c=>{
+    const d=document.createElement('div'); d.className='truncate text-[13px] text-[#F5F4F0] py-2.5 px-3 rounded-xl active:bg-[#2A2926] flex justify-between items-center';
+    d.innerHTML=`<span class="truncate">${c.title||'Untitled'}</span><span class="text-[10px] text-[#6B6964] ml-2">${new Date(c.updated).toLocaleDateString()}</span>`; d.onclick=()=>{openConv(c.id); closeSheets();}; 
+    let press; d.addEventListener('touchstart',()=>{press=setTimeout(()=>showConvContext(c),500);}); d.addEventListener('touchend',()=>clearTimeout(press));
+    recent.appendChild(d);
+  });
+}
+function newConv(){ const id='c_'+Date.now(); const conv={id,title:'New chat',created:Date.now(),updated:Date.now()}; state.currentConv=id; state.messages[id]=[]; idbPut('conversations',conv); state.conversations.unshift(conv); renderConvs(); showChat(); }
+async function openConv(id){ state.currentConv=id; const msgs=await idbGetAll('messages'); const filtered=msgs.filter(m=>m.convId===id).sort((a,b)=>a.ts-b.ts); state.messages[id]=filtered; showChat(); renderMessages(); }
+function showChat(){ $('#emptyView').classList.add('hidden'); $('#chatView').classList.remove('hidden'); $('#artifactView').classList.add('hidden'); }
+function showEmpty(){ $('#emptyView').classList.remove('hidden'); $('#chatView').classList.add('hidden'); $('#artifactView').classList.add('hidden'); }
+
+/* Messages Rendering */
+function mdToHtml(md){ try{ const raw=marked.parse(md||''); return raw; }catch{ return `<p>${(md||'').replace(/</g,'&lt;')}</p>`; } }
+function renderMessages(){
+  const host=$('#chatMessages'); host.innerHTML='';
+  const msgs=state.messages[state.currentConv]||[];
+  msgs.forEach(m=>{
+    const wrap=document.createElement('div'); wrap.className='group';
+    const role=m.role==='user'?'User':'Claude';
+    const bubble=document.createElement('div'); bubble.className=m.role==='user'?'bg-[#2A2926] border border-[#33312B] rounded-[18px] px-4 py-3 ml-8':'bg-transparent px-1 py-1';
+    if(m.thinking){ const th=document.createElement('div'); th.className='mb-3'; th.innerHTML=renderThinkingCard(m.thinking,m.thinkingDone); bubble.prepend(th); }
+    const contentDiv=document.createElement('div'); contentDiv.className='leading-relaxed text-[15px] text-[#F5F4F0] prose prose-invert max-w-none prose-p:my-2 prose-pre:my-3'; contentDiv.innerHTML=mdToHtml(m.content);
+    // tool inspector
+    if(m.toolCalls && m.toolCalls.length){ const insp=document.createElement('div'); insp.className='mt-3 bg-[#242421] border border-[#33312B] rounded-xl p-3 text-[12px]'; insp.innerHTML=`<div class="flex items-center gap-2 font-medium"><span>🔧</span><span>${m.toolCalls[0].name}: '${m.toolCalls[0].args?.query||''}' → ${m.toolCalls[0].result?.length||0} sources</span></div>`; insp.onclick=()=>{insp.classList.toggle('expanded');}; contentDiv.appendChild(insp); }
+    // citations
+    if(m.citations && m.citations.length){ const car=document.createElement('div'); car.className='mt-3 flex gap-2 overflow-x-auto scroll'; m.citations.forEach((c,i)=>{ const pill=document.createElement('button'); pill.className='shrink-0 bg-[#242421] border border-[#33312B] rounded-full px-3 py-1.5 text-[11px] flex items-center gap-1.5'; pill.innerHTML=`<span class="w-4 h-4 rounded-full bg-[#33312B] flex items-center justify-center">${i+1}</span><span class="truncate max-w-[120px]">${c.title||c.url}</span>`; pill.onclick=()=>showCitation(c); car.appendChild(pill); }); contentDiv.appendChild(car); }
+    bubble.appendChild(contentDiv);
+    // code block enhancements
+    bubble.querySelectorAll('pre code').forEach(block=>{ block.classList.add('line-numbers'); Prism.highlightElement(block); const btn=document.createElement('button'); btn.className='absolute top-2 right-2 bg-[#2A2926] border border-[#33312B] rounded-full px-2 py-1 text-[10px]'; btn.textContent='Copy'; btn.onclick=()=>{navigator.clipboard.writeText(block.textContent); btn.textContent='Copied'; setTimeout(()=>btn.textContent='Copy',1200); HAPTIC.light();}; const pre=block.parentElement; pre.style.position='relative'; pre.classList.add('bg-[#181817]','border','border-[#33312B]','rounded-xl','p-3','overflow-auto'); pre.appendChild(btn); });
+    // toolbar
+    if(m.role==='assistant'){ const tb=document.createElement('div'); tb.className='mt-3 flex items-center gap-2 text-[#9C9A92]'; tb.innerHTML=`<button class="touch44 w-8 h-8 rounded-full bg-[#242421] border border-[#33312B]"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button><button class="touch44 w-8 h-8 rounded-full bg-[#242421] border border-[#33312B]"><i data-lucide="git-branch" class="w-3.5 h-3.5"></i></button><button class="touch44 w-8 h-8 rounded-full bg-[#242421] border border-[#33312B]"><i data-lucide="volume-2" class="w-3.5 h-3.5"></i></button>`; bubble.appendChild(tb); }
+    wrap.appendChild(bubble);
+    // long press
+    let t; wrap.addEventListener('touchstart',()=>{t=setTimeout(()=>showMsgContext(m),500);}); wrap.addEventListener('touchend',()=>clearTimeout(t));
+    host.appendChild(wrap);
+  });
+  renderLucide();
+  // KaTeX
+  try{ renderMathInElement(host,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]}); }catch{}
+  $('#chatScroll').scrollTop=$('#chatScroll').scrollHeight;
+}
+function renderThinkingCard(thinking,done){
+  const secs=thinking.secs||0; const summary=(thinking.text||'').split('\n').slice(-1)[0]||'Reasoning...';
+  if(done){ return `<button class="thinkingDone bg-[#242421] border border-[#33312B] rounded-full px-3 py-1.5 text-[12px] flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-[#D97757]"></span>Thought for ${secs}s</button>`; }
+  return `<div class="bg-[#242421] border border-[#33312B] rounded-2xl px-4 py-3 flex items-center gap-3"><span class="w-2 h-2 rounded-full bg-[#D97757] dot"></span><div><div class="text-[12px] font-medium">Thinking (${secs}s)...</div><div class="text-[11px] text-[#9C9A92] truncate max-w-[220px]">${summary}</div></div></div>`;
+}
+
+/* Thinking Virtualized (IndexedDB buffer) */
+function pushThinkingChunk(chunk){
+  state.thinkBuffer.push(chunk);
+  if(state.thinkBuffer.length>3000){ state.thinkBuffer.splice(0,1000); }
+  idbPut('thinkBuf',{id:'current',chunks:state.thinkBuffer.slice(-500)});
+  const host=$('#thinkingHost'); if(host.classList.contains('hidden')){ host.classList.remove('hidden'); }
+  host.innerHTML=`<div class="bg-[#242421] border border-[#33312B] rounded-2xl p-3 max-h-[200px] overflow-auto mono text-[11px] leading-5"><div class="flex items-center gap-2 mb-2"><span class="w-2 h-2 rounded-full bg-[#D97757] dot"></span><span>Thinking stream • ${state.thinkBuffer.length} chunks</span></div><div>${state.thinkBuffer.slice(-200).join('').slice(-4000).replace(/</g,'&lt;')}</div></div>`;
+}
+
+/* Telemetry */
+let tpsTimer=null, outTokens=0, thinkTokens=0, startTime=0;
+function startTelemetry(){ outTokens=0; thinkTokens=0; startTime=Date.now(); $('#telemetryPill').classList.remove('hidden'); tpsTimer=setInterval(()=>{ const elapsed=(Date.now()-startTime)/1000; const tps=elapsed? (outTokens/elapsed).toFixed(1):0; const mode=state.pricingMode; const price=PRICING[mode]||PRICING.anthropic; const costThink=thinkTokens*price.think; const costOut=outTokens*price.out; $('#telemetryText').textContent=`Think: ${(thinkTokens/1000).toFixed(1)}k ($${costThink.toFixed(4)}) • Out: ${(outTokens/1000).toFixed(1)}k ($${costOut.toFixed(4)}) • ${tps} tps`; },400); }
+function stopTelemetry(){ clearInterval(tpsTimer); setTimeout(()=>$('#telemetryPill').classList.add('hidden'),1800); }
+
+/* Token Meter */
+$('#chatInput').addEventListener('input',function(){
+  this.style.height='auto'; this.style.height=Math.min(this.scrollHeight,140)+'px';
+  const tok=estimateTokens(this.value); const max=128000; const pct=tok/max*100;
+  $('#tokenMeter').classList.remove('hidden'); $('#tokenMeterLabel').textContent=`${(tok/1000).toFixed(1)}k / ${max/1000}k tokens`;
+  $('#tokenMeterFill').style.width=Math.min(pct,100)+'%';
+  $('#tokenMeterFill').style.background=pct>95?'#ef4444':pct>80?'#f59e0b':'#D97757';
+});
+
+/* Web Search */
+async function searchTavily(q,key){ const r=await fetch('https://api.tavily.com/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({api_key:key,query:q,max_results:5,include_answer:false})}); const j=await r.json(); return (j.results||[]).map(x=>({title:x.title,url:x.url,snippet:x.content?.slice(0,240),domain:new URL(x.url).hostname})); }
+async function searchBrave(q,key){ const r=await fetch(`https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(q)}&count=5`,{headers:{'X-Subscription-Token':key,Accept:'application/json'}}); const j=await r.json(); return (j.web?.results||[]).map(x=>({title:x.title,url:x.url,snippet:x.description,domain:new URL(x.url).hostname})); }
+async function searchSerper(q,key){ const r=await fetch('https://google.serper.dev/search',{method:'POST',headers:{'X-API-KEY':key,'Content-Type':'application/json'},body:JSON.stringify({q,gl:'us',num:5})}); const j=await r.json(); return (j.organic||[]).map(x=>({title:x.title,url:x.link,snippet:x.snippet,domain:new URL(x.link).hostname})); }
+async function performWebSearch(query){
+  const k=state.keys;
+  try{
+    if(k.tavily) return await searchTavily(query,k.tavily);
+    if(k.brave) return await searchBrave(query,k.brave);
+    if(k.serper) return await searchSerper(query,k.serper);
+  }catch(e){ console.warn(e); }
+  return [];
+}
+
+/* SSE Stream Processor */
+async function streamChat({messages,tools}){
+  const model=state.model; const keys=state.keys;
+  let apiKey='';
+  if(model.provider==='anthropic') apiKey=keys.anthropic;
+  else if(model.provider==='openai') apiKey=keys.openai;
+  else if(model.provider==='deepseek') apiKey=keys.deepseek;
+  else if(model.provider==='kimi') apiKey=keys.kimi;
+  if(!apiKey){ throw new Error(`Missing API key for ${model.provider}. Add in Settings.`); }
+
+  const base=model.base;
+  let url, headers, body;
+
+  if(model.provider==='anthropic'){
+    url=base+'/messages';
+    headers={'x-api-key':apiKey,'anthropic-version':'2023-06-01','Content-Type':'application/json'};
+    const sys=messages.filter(m=>m.role==='system').map(m=>m.content).join('\n');
+    const conv=messages.filter(m=>m.role!=='system').map(m=>({role:m.role==='assistant'?'assistant':'user',content:m.content}));
+    body={model:model.id,max_tokens:4096,system:sys||undefined,messages:conv,stream:true};
+    if(state.thinkingBudget!=='unlimited') body.thinking={type:'enabled',budget_tokens:parseInt(state.thinkingBudget)||8000};
+    if(tools && tools.length) body.tools=tools.map(t=>({name:t.function.name,description:t.function.description,input_schema:t.function.parameters}));
+  }else{
+    url=base+'/chat/completions';
+    headers={'Authorization':'Bearer '+apiKey,'Content-Type':'application/json'};
+    body={model:model.id,messages,stream:true,stream_options:{include_usage:true}};
+    if(tools && tools.length) body.tools=tools;
+    if(model.id.startsWith('o')||model.provider==='openai'){ body.reasoning_effort=state.reasoningEffort; }
+  }
+
+  const res=await fetch(url,{method:'POST',headers,body:JSON.stringify(body)});
+  if(!res.ok){ const txt=await res.text(); throw new Error(`API ${res.status}: ${txt.slice(0,400)}`); }
+  const reader=res.body.getReader(); const decoder=new TextDecoder(); let buf='';
+  let accText='', accThinking='', toolCalls=[], finishReason=null;
+  const onDelta=(d)=>{ if(d.text!==undefined){ accText+=d.text; outTokens=estimateTokens(accText); } if(d.thinking!==undefined){ accThinking+=d.thinking; thinkTokens=estimateTokens(accThinking); pushThinkingChunk(d.thinking); } if(d.tool){ toolCalls.push(d.tool); } };
+  while(true){
+    const {done,value}=await reader.read(); if(done) break;
+    buf+=decoder.decode(value,{stream:true});
+    const lines=buf.split('\n'); buf=lines.pop()||'';
+    for(const line of lines){
+      if(!line.trim()) continue;
+      if(model.provider==='anthropic'){
+        if(line.startsWith('event:')) continue;
+        if(line.startsWith('data:')){ try{
+          const j=JSON.parse(line.slice(5));
+          if(j.type==='content_block_delta'){
+            if(j.delta.type==='thinking_delta') onDelta({thinking:j.delta.thinking});
+            else if(j.delta.type==='text_delta') onDelta({text:j.delta.text});
+            else if(j.delta.type==='input_json_delta'){} // tool
+          } else if(j.type==='content_block_start' && j.content_block?.type==='tool_use'){ onDelta({tool:{name:j.content_block.name,args:{},id:j.content_block.id}}); }
+          else if(j.type==='message_delta' && j.delta?.stop_reason) finishReason=j.delta.stop_reason;
+        }catch{}}
+      }else{
+        if(!line.startsWith('data:')) continue;
+        const data=line.slice(5).trim(); if(data==='[DONE]'){ finishReason='stop'; break; }
+        try{
+          const j=JSON.parse(data);
+          const choice=j.choices?.[0]; if(!choice) continue;
+          if(choice.finish_reason) finishReason=choice.finish_reason;
+          const delta=choice.delta;
+          if(delta?.reasoning_content) onDelta({thinking:delta.reasoning_content});
+          if(delta?.content) onDelta({text:delta.content});
+          if(delta?.tool_calls){ delta.tool_calls.forEach(tc=>{ onDelta({tool:{name:tc.function?.name,args:tc.function?.arguments,id:tc.id}}); }); }
+        }catch{}
+      }
+      // live UI update
+      if(accText||accThinking){ updateStreamingUI(accText,accThinking); }
+    }
+  }
+  // post-process <think> tags
+  const thinkMatch=accText.match(/<think>([\s\S]*?)<\/think>/);
+  if(thinkMatch){ accThinking+=thinkMatch[1]; accText=accText.replace(/<think>[\s\S]*?<\/think>/g,'').trim(); }
+  return {text:accText,thinking:accThinking,toolCalls,finishReason};
+}
+function updateStreamingUI(text,thinking){
+  const msgs=state.messages[state.currentConv]||[];
+  let last=msgs[msgs.length-1];
+  if(!last || last.role!=='assistant' || last.streamDone){ last={id:'m_'+Date.now(),convId:state.currentConv,role:'assistant',content:'',thinking:{text:'',secs:0},ts:Date.now(),streamDone:false}; msgs.push(last); state.messages[state.currentConv]=msgs; }
+  last.content=text; last.thinking={text:thinking,secs:Math.floor((Date.now()-startTime)/1000)}; renderMessages();
+}
+
+/* Zero-gap continuation */
+async function handleContinuationIfNeeded(lastResult, messages){
+  if(lastResult.finishReason==='length' || lastResult.finishReason==='max_tokens'){
+    const contPrompt=`Your previous response was truncated mid-code. Resume strictly from the exact character where you stopped. DO NOT repeat prior tokens. DO NOT output conversational pleasantries. DO NOT open a new markdown code fence. Continue raw code directly.`;
+    const newMsgs=[...messages,{role:'user',content:contPrompt}];
+    const res=await streamChat({messages:newMsgs});
+    let cleaned=res.text.replace(/^```[a-z]*\n?/i,'');
+    lastResult.text+=cleaned;
+    updateStreamingUI(lastResult.text,lastResult.thinking);
+    if(res.finishReason==='length') return handleContinuationIfNeeded(res,newMsgs);
+  }
+  return lastResult;
+}
+
+/* Main send flow */
+async function sendMessage(){
+  const input=$('#chatInput'); const txt=input.value.trim(); if(!txt) return;
+  if(!state.currentConv) newConv();
+  HAPTIC.medium();
+  const convId=state.currentConv;
+  const userMsg={id:'m_'+Date.now(),convId,role:'user',content:txt,ts:Date.now()}; state.messages[convId].push(userMsg); idbPut('messages',userMsg);
+  input.value=''; $('#tokenMeter').classList.add('hidden'); renderMessages();
+  if(!navigator.onLine){ state.offlineQueue.push(txt); $('#queueBadge').classList.remove('hidden'); return; }
+
+  const history=state.messages[convId].map(m=>({role:m.role,content:m.content}));
+  const sysPrompt=`You are Claude, a helpful AI built with warm editorial tone. You have tools: web_search(query). Use artifacts for code: wrap files as \`\`\`language:filename. Support thinking.`;
+  const allMsgs=[{role:'system',content:sysPrompt},...history];
+
+  const tools=[{type:'function',function:{name:'web_search',description:'Search the web for up-to-date info',parameters:{type:'object',properties:{query:{type:'string',description:'search query'}},required:['query']}}}];
+  const hasSearch=!!(state.keys.tavily||state.keys.brave||state.keys.serper);
+
+  try{
+    state.isStreaming=true; startTelemetry();
+    try{ await navigator.wakeLock?.request('screen'); }catch{}
+    let result=await streamChat({messages:allMsgs,tools:hasSearch?tools:[]});
+    result=await handleContinuationIfNeeded(result,allMsgs);
+
+    // handle tool calls
+    if(result.toolCalls && result.toolCalls.length){
+      const citations=[]; let toolResults='';
+      for(const tc of result.toolCalls){
+        let args={}; try{ args=typeof tc.args==='string'?JSON.parse(tc.args):tc.args||{}; }catch{}
+        if(tc.name==='web_search' && args.query){
+          const sources=await performWebSearch(args.query);
+          citations.push(...sources); toolResults+=`Sources for ${args.query}: ${sources.map(s=>s.url).join(', ')}\n`;
+          // second call with tool result
+          const secondMsgs=[...allMsgs,{role:'assistant',content:result.text,tool_calls:result.toolCalls},{role:'tool',content:JSON.stringify(sources),tool_call_id:tc.id}];
+          const second=await streamChat({messages:secondMsgs});
+          result.text+=`\n\n${second.text}`; result.citations=citations;
+        }
+      }
+    }
+
+    // parse artifacts from code fences with filename
+    const artifactRegex=/```([a-z0-9]+)(?::([^\n]+))?\n([\s\S]*?)```/gi;
+    let m; while((m=artifactRegex.exec(result.text))!==null){ const lang=m[1]; const fname=m[2]||`file-${state.artifacts.length}.${lang}`; const content=m[3]; state.artifacts.push({id:'a_'+Date.now()+'_'+state.artifacts.length,name:fname,lang,content}); }
+
+    const assistantMsg={id:'m_'+Date.now()+1,convId,role:'assistant',content:result.text,thinking:{text:result.thinking,secs:Math.floor((Date.now()-startTime)/1000),done:true},toolCalls:result.toolCalls,citations:result.citations||[],ts:Date.now(),streamDone:true};
+    state.messages[convId].push(assistantMsg); idbPut('messages',assistantMsg);
+    renderMessages(); renderArtifacts();
+    // title
+    const conv=state.conversations.find(c=>c.id===convId); if(conv && conv.title==='New chat'){ conv.title=txt.slice(0,42); conv.updated=Date.now(); idbPut('conversations',conv); renderConvs(); }
+
+    HAPTIC.confirm();
+  }catch(e){
+    const errMsg={id:'m_'+Date.now(),convId,role:'assistant',content:`**Error:** ${e.message}\n\nCheck Settings → API keys and network.`,ts:Date.now()}; state.messages[convId].push(errMsg); renderMessages(); HAPTIC.medium();
+  }finally{ state.isStreaming=false; stopTelemetry(); try{ await navigator.wakeLock?.release(); }catch{} }
+}
+
+/* Artifacts */
+function renderArtifacts(){
+  const tabs=$('#artifactTabs'); tabs.innerHTML='';
+  state.artifacts.forEach((a,i)=>{
+    const b=document.createElement('button'); b.className=`shrink-0 h-8 px-3 rounded-full border text-[12px] ${state.activeArtifact===a.id?'bg-white text-[#181817] border-white':'bg-[#181817] border-[#33312B] text-[#9C9A92]'}`; b.textContent=a.name; b.onclick=()=>{state.activeArtifact=a.id; renderArtifactContent(); renderArtifacts();}; tabs.appendChild(b);
+  });
+  if(state.artifacts.length){ $('#btnArtifactsDrawer').classList.remove('opacity-50'); if(!state.activeArtifact) state.activeArtifact=state.artifacts[0].id; renderArtifactContent(); }
+}
+function renderArtifactContent(){
+  const art=state.artifacts.find(a=>a.id===state.activeArtifact); if(!art) return;
+  $('#artifactCodePane').textContent=art.content;
+  // preview
+  try{
+    const frame=$('#artifactFrame');
+    if(art.lang==='html' || art.name.endsWith('.html')){ frame.srcdoc=art.content; }
+    else if(art.lang==='svg' || art.name.endsWith('.svg')){ frame.srcdoc=`<html><body style="margin:0;display:grid;place-items:center;min-height:100vh;background:white">${art.content}</body></html>`; }
+    else if(['js','javascript','jsx','tsx'].includes(art.lang) || art.name.endsWith('.js') || art.name.endsWith('.jsx')){
+      const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><script src="https://unpkg.com/react@18/umd/react.production.min.js"><\/script><script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"><\/script><script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script></head><body><div id="root"></div><script type="text/babel">\n${art.content}\n<\/script></body></html>`; frame.srcdoc=html;
+    } else if(art.lang==='mermaid'){ frame.srcdoc=`<html><head><script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"><\/script></head><body><div class="mermaid">${art.content}</div><script>mermaid.initialize({startOnLoad:true});<\/script></body></html>`; }
+    else{ frame.srcdoc=`<html><body><pre style="font-family:monospace;white-space:pre-wrap;padding:16px">${art.content.replace(/</g,'&lt;')}</pre></body></html>`; }
+  }catch(e){ console.warn(e); }
+}
+
+/* Myers Diff */
+function myersDiff(aLines,bLines){
+  const N=aLines.length, M=bLines.length; const max=N+M; const v=new Array(2*max+1).fill(-1); v[max+1]=0; const trace=[];
+  for(let d=0;d<=max;d++){ const cur={}; for(let k=-d;k<=d;k+=2){ let x; if(k===-d || (k!==d && v[max+k-1]<v[max+k+1])) x=v[max+k+1]; else x=v[max+k-1]+1; let y=x-k; while(x<N && y<M && aLines[x]===bLines[y]){x++;y++;} v[max+k]=x; cur[k]=x; if(x>=N && y>=M){ trace.push(cur); return buildDiff(trace,aLines,bLines); } } trace.push(cur); }
+  return [];
+}
+function buildDiff(trace,a,b){ let x=a.length,y=b.length; const diff=[]; for(let d=trace.length-1;d>=0;d--){ const v=trace[d]; const k=x-y; const prevK=(k===-d || (k!==d && (v[k-1]??-1)<(v[k+1]??-1)))?k+1:k-1; const prevX=v[prevK]??0; const prevY=prevX-prevK; while(x>prevX && y>prevY){ diff.unshift({type:'equal',a:a[x-1],b:b[y-1]}); x--;y--; } if(d>0){ if(x===prevX) diff.unshift({type:'insert',b:b[y-1]}); else diff.unshift({type:'delete',a:a[x-1]}); x=prevX; y=prevY; } } return diff; }
+function renderDiff(diff){ return diff.map(l=>{ if(l.type==='equal') return `<div class="text-[#9C9A92]">  ${l.a}</div>`; if(l.type==='insert') return `<div class="bg-green-500/10 text-green-300">+ ${l.b}</div>`; return `<div class="bg-red-500/10 text-red-300">- ${l.a}</div>`; }).join(''); }
+
+/* GitHub Client */
+async function ghFetch(path,opts={}){ const key=state.keys.github; if(!key) throw new Error('GitHub PAT missing'); const r=await fetch(`https://api.github.com${path}`,{...opts,headers:{Authorization:`Bearer ${key}`,Accept:'application/vnd.github+json',...(opts.headers||{})}}); if(!r.ok){ const t=await r.text(); throw new Error(`GitHub ${r.status}: ${t.slice(0,300)}`); } return r.json(); }
+async function listRepos(){ const repos=await ghFetch('/user/repos?sort=updated&per_page=50'); const host=$('#ghList'); host.innerHTML=''; repos.forEach(repo=>{ const row=document.createElement('div'); row.className='bg-[#181817] border border-[#33312B] rounded-2xl p-3 flex items-center justify-between'; row.innerHTML=`<div><div class="text-[13px] font-medium">${repo.full_name}</div><div class="text-[11px] text-[#9C9A92]">${repo.language||''} • ★${repo.stargazers_count}</div></div><button class="text-[11px] px-3 py-1.5 rounded-full bg-white text-[#181817]">Open</button>`; row.querySelector('button').onclick=async()=>{ state.github.repo=repo; const branch=repo.default_branch; const tree=await ghFetch(`/repos/${repo.full_name}/git/trees/${branch}?recursive=1`); state.github.tree=tree.tree||[]; host.innerHTML=`<div class="text-[12px] text-[#9C9A92] mb-2">${repo.full_name} • ${tree.tree.length} files</div>`+state.github.tree.slice(0,200).map(f=>`<div class="py-2 px-3 rounded-xl hover:bg-[#2A2926] text-[12px] mono flex justify-between"><span>${f.path}</span><button class="text-[10px] px-2 py-1 rounded-full bg-[#2A2926] border border-[#33312B]" data-path="${f.path}">Load @</button></div>`).join(''); host.querySelectorAll('button[data-path]').forEach(b=>b.onclick=async()=>{ const p=b.dataset.path; const file=await ghFetch(`/repos/${repo.full_name}/contents/${p}`); const content=atob(file.content||''); $('#chatInput').value+=` @${p} `; state.github.selectedFiles.push({path:p,sha:file.sha,content}); HAPTIC.light(); }); }; host.appendChild(row); }); }
+
+/* Search, PDF, Files */
+$('#fileInput').addEventListener('change',async e=>{
+  for(const f of e.target.files){
+    if(f.type==='application/pdf'){ const buf=await f.arrayBuffer(); const pdf=await pdfjsLib.getDocument({data:buf}).promise; let text=''; for(let i=1;i<=pdf.numPages;i++){ const page=await pdf.getPage(i); const c=await page.getTextContent(); text+=c.items.map(it=>it.str).join(' ')+'\n'; if(text.length>12000) break; } $('#chatInput').value+=`\n\n[PDF ${f.name}]:\n${text.slice(0,10000)}\n`; }
+    else{ const txt=await f.text(); $('#chatInput').value+=`\n\n[File ${f.name}]:\n${txt.slice(0,12000)}\n`; }
+  }
+  closeSheets(); HAPTIC.light();
+});
+
+/* Vault UI */
+$('#btnLockVault').onclick=async()=>{ const pin=$('#vaultPin').value; if(pin.length<4) return alert('PIN 4+ chars'); await vaultInit(pin); $('#vaultStatus').textContent='Vault: locked & initialized'; HAPTIC.confirm(); };
+$('#btnUnlockVault').onclick=async()=>{ const pin=$('#vaultPin').value; try{ await vaultLoad(pin); const enc=await idbGet('vault','keys'); if(enc){ state.keys=await vaultDecrypt(enc.v); Object.entries(state.keys).forEach(([k,v])=>{ const el=document.querySelector(`.keyInput[data-key="${k}"]`); if(el) el.value=v; }); } $('#vaultStatus').textContent='Vault: unlocked, keys loaded'; HAPTIC.light(); }catch(e){ alert('Unlock failed: '+e.message); } };
+$('#btnSaveKeys').onclick=async()=>{ if(!vaultKey) return alert('Unlock vault first'); const obj={}; $$('.keyInput').forEach(el=>{ if(el.value) obj[el.dataset.key]=el.value; }); state.keys=obj; const pack=await vaultEncrypt(obj); await idbPut('vault',{k:'keys',...pack}); $('#vaultStatus').textContent='Vault: keys encrypted & saved'; HAPTIC.confirm(); closeSheets(); };
+
+/* Model Sheet */
+function renderModelList(){ const host=$('#modelList'); host.innerHTML=''; MODELS.forEach(m=>{ const row=document.createElement('button'); row.className=`w-full text-left px-4 py-3 rounded-xl border ${state.model.id===m.id?'bg-[#D97757]/15 border-[#D97757]/30':'bg-[#181817] border-[#33312B]'} active:bg-[#2A2926]`; row.innerHTML=`<div class="text-[13px] font-medium">${m.label}</div><div class="text-[11px] text-[#9C9A92]">${m.provider} • ${m.id}</div>`; row.onclick=()=>{ state.model=m; $('#modelLabel').textContent=m.label; closeSheets(); HAPTIC.light(); }; host.appendChild(row); }); }
+$$('.budgetBtn').forEach(b=>b.onclick=()=>{ $$('.budgetBtn').forEach(x=>{x.classList.remove('border-[#D97757]','bg-[#D97757]/20'); x.classList.add('border-[#33312B]','bg-[#181817]');}); b.classList.add('border-[#D97757]','bg-[#D97757]/20'); state.thinkingBudget=b.dataset.budget; $('#budgetWarning').classList.toggle('hidden',b.dataset.budget!=='unlimited'); HAPTIC.light(); });
+
+/* Events */
+$('#btnMenu').onclick=()=>{openDrawer(); HAPTIC.light();};
+$('#drawerBackdrop').onclick=closeSheets; $('#sheetBackdrop').onclick=closeSheets;
+$$('[data-close-sheet]').forEach(b=>b.onclick=closeSheets);
+$('#btnSettings').onclick=()=>{openSheet($('#settingsSheet'));};
+$('#btnModel').onclick=()=>{renderModelList(); openSheet($('#modelSheet'));};
+$('#btnAttach').onclick=()=>{openSheet($('#attachSheet'));};
+$('#btnNewChat').onclick=()=>{newConv(); closeSheets();};
+$('#btnArtifactsDrawer').onclick=()=>{ $('#chatView').classList.add('hidden'); $('#emptyView').classList.add('hidden'); $('#artifactView').classList.remove('hidden'); closeSheets(); };
+$('#btnCloseArtifacts').onclick=()=>{ $('#artifactView').classList.add('hidden'); showChat(); };
+$('#btnCopyArtifact').onclick=()=>{ const art=state.artifacts.find(a=>a.id===state.activeArtifact); if(art) navigator.clipboard.writeText(art.content); HAPTIC.light(); };
+$('#btnSend').onclick=sendMessage;
+$('#chatInput').addEventListener('keydown',e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); } });
+$('#btnDismissBanner').onclick=()=>$('#contextBanner').classList.add('hidden');
+$('#btnGithubDrawer').onclick=()=>{openSheet($('#githubSheet'));};
+$('#btnListRepos').onclick=listRepos;
+$('#btnGhCommit').onclick=async()=>{
+  if(!state.github.repo) return alert('Select repo first');
+  const art=state.artifacts.find(a=>a.id===state.activeArtifact); if(!art) return alert('No artifact selected');
+  const path=art.name; const existing=state.github.selectedFiles.find(f=>f.path===path);
+  const oldContent=existing?.content||''; const diff=myersDiff(oldContent.split('\n'),art.content.split('\n'));
+  const ok=confirm(`Commit ${path} to ${state.github.repo.full_name}?`); if(!ok) return;
+  const contentB64=btoa(unescape(encodeURIComponent(art.content)));
+  await ghFetch(`/repos/${state.github.repo.full_name}/contents/${path}`,{method:'PUT',body:JSON.stringify({message:`feat(ui): implement ${path} — claude parchment theme`,content:contentB64,sha:existing?.sha})});
+  HAPTIC.confirm(); alert('Committed!');
+};
+$('#btnGhBranchPR').onclick=async()=>{
+  if(!state.github.repo) return alert('Select repo');
+  const art=state.artifacts.find(a=>a.id===state.activeArtifact); if(!art) return alert('No artifact');
+  const base=state.github.repo.default_branch; const branch=`claude/${Date.now()}`;
+  const ref=await ghFetch(`/repos/${state.github.repo.full_name}/git/ref/heads/${base}`); const sha=ref.object.sha;
+  await ghFetch(`/repos/${state.github.repo.full_name}/git/refs`,{method:'POST',body:JSON.stringify({ref:`refs/heads/${branch}`,sha})});
+  const contentB64=btoa(unescape(encodeURIComponent(art.content)));
+  await ghFetch(`/repos/${state.github.repo.full_name}/contents/${art.name}`,{method:'PUT',body:JSON.stringify({message:`feat: ${art.name} from Claude workbench`,content:contentB64,branch})});
+  await ghFetch(`/repos/${state.github.repo.full_name}/pulls`,{method:'POST',body:JSON.stringify({title:`AI: ${art.name}`,head:branch,base,body:'Generated via offline BYOK Claude workbench with Myers diff and artifact preview.'})});
+  HAPTIC.confirm(); alert('Branch & PR created!');
+};
+$('#btnGhActions').onclick=async()=>{
+  if(!state.github.repo) return alert('Select repo');
+  const runs=await ghFetch(`/repos/${state.github.repo.full_name}/actions/runs?per_page=5`);
+  const host=$('#ghList'); host.innerHTML=runs.workflow_runs.map(r=>`<div class="bg-[#181817] border border-[#33312B] rounded-xl p-3"><div class="text-[12px] font-medium">${r.name} • ${r.status} • ${r.conclusion||''}</div><div class="text-[11px] text-[#9C9A92]">${new Date(r.created_at).toLocaleString()}</div></div>`).join('');
+  const failed=runs.workflow_runs.find(r=>r.conclusion==='failure');
+  if(failed){ const logs=await ghFetch(`/repos/${state.github.repo.full_name}/actions/runs/${failed.id}/logs`).catch(()=>null); if(logs){ $('#chatInput').value=`Build failed ${failed.id}. Logs: ${JSON.stringify(logs).slice(0,4000)}. Please patch.`; HAPTIC.medium(); } }
+};
+
+/* Attach actions */
+$$('[data-attach]').forEach(b=>b.onclick=()=>{
+  const t=b.dataset.attach;
+  if(t==='file' || t==='pdf'){ $('#fileInput').click(); }
+  else if(t==='github'){ openSheet($('#githubSheet')); listRepos(); }
+  else if(t==='search'){ const q=prompt('Web search query:'); if(q){ performWebSearch(q).then(s=>{ $('#chatInput').value+=`\n[Search ${q}: ${s.map(x=>x.url).join(', ')}]`; }); } }
+  else if(t==='code'){ const name=prompt('Artifact filename:','App.jsx'); if(name){ const content=prompt('Paste code or leave empty for template:')||'export default function App(){return <div className=\"p-6\">Hello Claude Workbench</div>}'; state.artifacts.push({id:'a_'+Date.now(),name,lang:name.split('.').pop(),content}); renderArtifacts(); $('#artifactView').classList.remove('hidden'); $('#chatView').classList.add('hidden'); $('#emptyView').classList.add('hidden'); } }
+  closeSheets();
+});
+
+/* Context menus */
+function showMsgContext(msg){
+  HAPTIC.light(); const host=$('#contextActions'); host.innerHTML=`
+    <button data-act="copy" class="w-full text-left px-4 py-3 rounded-xl bg-[#181817] border border-[#33312B] text-[13px]">Copy Text</button>
+    <button data-act="tts" class="w-full text-left px-4 py-3 rounded-xl bg-[#181817] border border-[#33312B] text-[13px]">Read Aloud (TTS)</button>
+    <button data-act="branch" class="w-full text-left px-4 py-3 rounded-xl bg-[#181817] border border-[#33312B] text-[13px]">Fork Branch</button>
+    <button data-act="delete" class="w-full text-left px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-[13px] text-red-300">Delete</button>
+  `;
+  host.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    if(b.dataset.act==='copy') navigator.clipboard.writeText(msg.content);
+    if(b.dataset.act==='tts'){ const u=new SpeechSynthesisUtterance(msg.content.slice(0,4000)); speechSynthesis.speak(u); }
+    if(b.dataset.act==='delete'){ const conv=state.currentConv; state.messages[conv]=state.messages[conv].filter(m=>m.id!==msg.id); renderMessages(); }
+    closeSheets();
+  });
+  openSheet($('#contextSheet'));
+}
+function showConvContext(conv){ HAPTIC.light(); const host=$('#contextActions'); host.innerHTML=`<div class="px-4 py-2 text-[12px] text-[#9C9A92]">${conv.title}</div><button class="w-full text-left px-4 py-3 rounded-xl bg-[#181817] border border-[#33312B] text-[13px]">Pin</button><button class="w-full text-left px-4 py-3 rounded-xl bg-[#181817] border border-[#33312B] text-[13px]">Rename</button><button class="w-full text-left px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-[13px] text-red-300">Delete</button>`; openSheet($('#contextSheet')); }
+function showCitation(c){ $('#citeContent').innerHTML=`<div class="text-[13px] font-medium">${c.title||c.url}</div><div class="text-[11px] text-[#9C9A92] mt-1">${c.domain||''}</div><div class="text-[12px] mt-3 leading-relaxed">${c.snippet||''}</div><a href="${c.url}" target="_blank" class="mt-4 inline-block bg-white text-[#181817] rounded-full px-4 py-2 text-[12px]">Open source</a>`; openSheet($('#citeSheet')); }
+
+/* Pull to refresh */
+let startY=0, pulling=false;
+$('#chatScroll').addEventListener('touchstart',e=>{ if($('#chatScroll').scrollTop<=0){ startY=e.touches[0].clientY; pulling=true; } });
+$('#chatScroll').addEventListener('touchmove',e=>{
+  if(!pulling) return; const dy=e.touches[0].clientY-startY; if(dy>0){ $('#pullIndicator').style.height=Math.min(dy,90)+'px'; if(dy>70){ HAPTIC.soft(); $('#pullIndicator').innerHTML='<div class="w-6 h-6 rounded-full bg-[#D97757] flex items-center justify-center">↻</div>'; } }
+});
+$('#chatScroll').addEventListener('touchend',()=>{ if(pulling){ const h=parseInt($('#pullIndicator').style.height||'0'); if(h>70){ const msgs=state.messages[state.currentConv]; if(msgs && msgs.length){ const lastUser=[...msgs].reverse().find(m=>m.role==='user'); if(lastUser){ $('#chatInput').value=lastUser.content; sendMessage(); } } } $('#pullIndicator').style.height='0px'; pulling=false; } });
+
+/* Keyboard awareness */
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize',()=>{
+    const vv=window.visualViewport; const dock=$('#inputDock'); if(vv.height<window.innerHeight*0.85){ dock.style.transform=`translateY(-${window.innerHeight-vv.height-vv.offsetTop}px)`; } else { dock.style.transform='translateY(0)'; }
+  });
+}
+
+/* Quick prompts */
+$$('.quickPrompt').forEach(b=>b.onclick=()=>{ $('#chatInput').value=b.textContent; $('#chatInput').dispatchEvent(new Event('input')); });
+
+/* PWA manifest + SW via blob */
+(async()=>{
+  const manifest={name:'Claude BYOK Workbench',short_name:'Claude',start_url:'.',display:'standalone',background_color:'#181817',theme_color:'#181817',icons:[{src:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="%23D97757"/></svg>',sizes:'192x192',type:'image/svg+xml'}]};
+  const mBlob=new Blob([JSON.stringify(manifest)],{type:'application/json'}); const mUrl=URL.createObjectURL(mBlob); const link=document.createElement('link'); link.rel='manifest'; link.href=mUrl; document.head.appendChild(link);
+  if('serviceWorker' in navigator){
+    const sw=`self.addEventListener('fetch',e=>{ e.respondWith(fetch(e.request).catch(()=>caches.match(e.request))); }); self.addEventListener('install',e=>{ self.skipWaiting(); });`;
+    const swBlob=new Blob([sw],{type:'text/javascript'}); const swUrl=URL.createObjectURL(swBlob); try{ await navigator.serviceWorker.register(swUrl); }catch{}
+  }
+})();
+
+/* Init */
+(async()=>{
+  renderLucide(); await loadConvs();
+  const v=await idbGet('vault','salt'); if(v) $('#vaultStatus').textContent='Vault: encrypted (locked)';
+  // restore artifacts
+  const arts=await idbGetAll('artifacts'); if(arts) state.artifacts=arts;
+  // online queue
+  window.addEventListener('online',()=>{ if(state.offlineQueue.length){ $('#queueBadge').classList.add('hidden'); state.offlineQueue.forEach(q=>{ $('#chatInput').value=q; sendMessage(); }); state.offlineQueue=[]; } });
+})();
+</script>
+<script>(function(){var loc=location.href.replace(/#.*$/,"");var ATTR_NAMES=["data-product-id","data-productid","data-product_id","product-id","productid","product_id","data-source-entity-id","source-entity-id","source_entity_id","data-product","data-metadata","data-meta"];var DATASET_KEYS=["productId","productid","product_id","sourceEntityId","sourceentityid","source_entity_id","product","metadata","meta"];function readProductId(value){if(typeof value!=="string"||value.length===0)return null;if(/^[0-9]{6,}$/.test(value))return value;var match=value.match(/(?:product(?:_|-)?id|source(?:_|-)?entity(?:_|-)?id)["'=:\s]+([0-9]{6,})/i);return match?match[1]:null}function extractProductId(start){for(var node=start;node&&node!==document.body;node=node.parentElement){for(var i=0;i<ATTR_NAMES.length;i++){var attrValue=node.getAttribute&&node.getAttribute(ATTR_NAMES[i]);var attrProductId=readProductId(attrValue);if(attrProductId)return attrProductId}var dataset=node.dataset||null;if(dataset){for(var j=0;j<DATASET_KEYS.length;j++){var dataValue=dataset[DATASET_KEYS[j]];var dataProductId=readProductId(dataValue);if(dataProductId)return dataProductId}}}return null}function isInlineMediaSlotElement(node){return !!(node&&node.getAttribute&&node.getAttribute("data-clippy-inline-media-slot")!==null)}function findInlineMediaSlot(start){for(var node=start;node&&node!==document.body;node=node.parentElement){if(isInlineMediaSlotElement(node))return node}return null}function readInlineMediaUrl(node){if(!node)return null;return node.getAttribute&&((node.getAttribute("data-clippy-inline-media-url")||node.getAttribute("data-url")||node.getAttribute("data_url")))||node.href||null}function stripHash(url){return String(url).replace(/#.*$/,"")}function urlsMatch(a,b){if(!a||!b)return false;try{return stripHash(new URL(a,loc).href)===stripHash(new URL(b,loc).href)}catch(_){return stripHash(a)===stripHash(b)}}function isFirstPartyReelUrl(value){try{var url=new URL(value,loc);if(url.protocol!=="https:")return false;var host=url.hostname.toLowerCase();var supported=host==="instagram.com"||host.endsWith(".instagram.com")||host==="facebook.com"||host.endsWith(".facebook.com");return supported&&/\/reels?\//i.test(url.pathname)}catch(_){return false}}function isInlineMediaUrlClick(node,href){var slot=findInlineMediaSlot(node);if(!slot)return false;var slotUrl=readInlineMediaUrl(slot);if(slotUrl)return urlsMatch(href,slotUrl);return isFirstPartyReelUrl(href)}function findDataHref(start){for(var node=start;node&&node!==document.body;node=node.parentElement){if(node.getAttribute){var href=node.getAttribute("data-href")||node.getAttribute("data-url");if(href)return{href:href,node:node}}}return null}var nativeOpen=window.open;window.open=function(url){if(parent!==window&&typeof url==="string"&&/^https?:\/\//.test(url)){parent.postMessage({type:"ecto:usercontent-link-click",href:url},"*");return null}return nativeOpen?nativeOpen.apply(window,arguments):null};document.addEventListener("click",function(e){var target=e.target instanceof Element?e.target:null;if(!target)return;if(parent===window)return;var a=target.closest?target.closest("a[href]"):null;if(a&&a.href&&/^https?:\/\//.test(a.href)&&a.href.replace(/#.*$/,"")!==loc){if(isInlineMediaUrlClick(a,a.href))return;var productId=extractProductId(target)||extractProductId(a);if(productId){e.preventDefault();parent.postMessage({type:"ecto-artifact-link-click",productId:productId},"*");return}e.preventDefault();parent.postMessage({type:"ecto:usercontent-link-click",href:a.href},"*");return}var dataHref=findDataHref(target);if(dataHref&&/^https?:\/\//.test(dataHref.href)&&dataHref.href.replace(/#.*$/,"")!==loc){if(isInlineMediaUrlClick(dataHref.node,dataHref.href))return;e.preventDefault();parent.postMessage({type:"ecto:usercontent-link-click",href:dataHref.href},"*")}},true)})();</script><script>(function(){var FOCUS_TYPE="ecto:artifact-focus-request";var CLOSE_TYPE="ecto:artifact-close-request";function focusArtifactDocument(){var body=document.body;if(!body)return;try{window.focus();}catch(e){}if(!body.hasAttribute("tabindex"))body.setAttribute("tabindex","-1");try{body.focus({preventScroll:true});}catch(e){try{body.focus();}catch(e2){}}}window.addEventListener("message",function(event){if(event.source!==window.parent)return;var data=event.data;if(!data||typeof data!=="object"||data.type!==FOCUS_TYPE)return;if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",focusArtifactDocument,{once:true});return;}focusArtifactDocument();});window.addEventListener("keydown",function(event){if(event.key!=="Escape")return;window.setTimeout(function(){if(event.defaultPrevented)return;window.parent.postMessage({type:CLOSE_TYPE},"*");},0);});})();</script></body>
+</html>
